@@ -5,7 +5,7 @@ from loguru import logger
 from app.core.settings.app import AppSettings
 
 
-async def connect_to_db(app: FastAPI, settings: AppSettings) -> None:
+async def connect_to_database(app: FastAPI, settings: AppSettings) -> None:
     logger.info("Connecting to PostgreSQL...")
     dsn = str(settings.database_url)
     if "+asyncpg" in dsn:
@@ -19,7 +19,7 @@ async def connect_to_db(app: FastAPI, settings: AppSettings) -> None:
     logger.info("Connection completed")
 
 
-async def close_db_connection(app: FastAPI) -> None:
+async def close_database_connection(app: FastAPI) -> None:
     logger.info("Closing connection to database")
 
     await app.state.pool.close()
