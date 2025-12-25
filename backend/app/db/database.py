@@ -9,14 +9,16 @@ Base = declarative_base()
 
 engine = create_async_engine(
     settings.database_url.unicode_string(),
-    echo=settings.debug,
+    echo = settings.debug,
+    pool_size = settings.connection_count,
+    max_overflow = settings.additional_connections
 )
 
 
 async_session_factory = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
+    bind = engine,
+    class_ = AsyncSession,
+    expire_on_commit = False,
 )
 
 

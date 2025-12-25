@@ -15,12 +15,12 @@ class AppSettings(BaseAppSettings):
     openapi_url: str = "/openapi.json"
     redoc_url: str = "/redoc"
     title: str = "FinTrack API"
-    version: str = "0.0.1"
+    version: str = "0.1.0"
 
     database_url: PostgresDsn
 
-    max_connection_count: int = 10
-    min_connection_count: int = 10
+    connection_count: int = 10
+    additional_connections: int = 0
 
     secret_key: SecretStr
     algorithm: str = "HS256"

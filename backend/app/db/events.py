@@ -1,27 +1,25 @@
-import asyncpg # type: ignore
 from fastapi import FastAPI
 from loguru import logger
+from sqlalchemy import text
 
 from app.core.settings.app import AppSettings
+from app.db.database import engine
 
 
 async def connect_to_database(app: FastAPI, settings: AppSettings) -> None:
     logger.info("Connecting to PostgreSQL...")
-    dsn = str(settings.database_url)
-    if "+asyncpg" in dsn:
-        dsn = dsn.replace("+asyncpg", "")
-
-    app.state.pool = await asyncpg.create_pool( # type: ignore
-        dsn,
-        min_size=settings.min_connection_count,
-        max_size=settings.max_connection_count,
-    )
-    logger.info("Connection completed")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        logger.info("Connection completed")
+    except Exception as e:
+        logger.exception(f"Error connecting to database: {e}")
 
 
 async def close_database_connection(app: FastAPI) -> None:
     logger.info("Closing connection to database")
-
-    await app.state.pool.close()
-
-    logger.info("Connection closed")
+    try:
+        await engine.dispose()
+        logger.info("Connection closed")
+    except Exception as e:
+        logger.exception(f"Error closing database connection: {e}")
