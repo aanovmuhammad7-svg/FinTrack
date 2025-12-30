@@ -5,6 +5,7 @@ import uvicorn
 
 from app.core.config import settings
 from app.core.events import create_start_app_handler, create_stop_app_handler
+from app.api.routers import api_router
 
 
 @asynccontextmanager
@@ -30,6 +31,8 @@ def get_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    application.include_router(api_router)
 
     return application
 

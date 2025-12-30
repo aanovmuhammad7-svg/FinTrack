@@ -9,7 +9,7 @@ Base = declarative_base()
 
 engine = create_async_engine(
     settings.database_url.unicode_string(),
-    echo = settings.debug,
+    echo = False,
     pool_size = settings.connection_count,
     max_overflow = settings.additional_connections
 )
