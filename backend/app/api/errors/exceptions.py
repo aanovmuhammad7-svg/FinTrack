@@ -63,19 +63,9 @@ class RefreshTokenNotFoundException(ProjectException):
     detail = "Токен обновления не предоставлен"
 
 
-class InvalidRefreshTokenException(ProjectException):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Недействительный токен обновления"
-
-
 class AccessTokenNotFoundException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Токен доступа не предоставлен"
-
-
-class InvalidAccessTokenException(ProjectException):
-    status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Недействительный токен доступа"
 
 
 class InvalidTokenException(ProjectException):
@@ -86,11 +76,6 @@ class InvalidTokenException(ProjectException):
 class ExpiredTokenException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Токен просрочен"
-
-
-class InvalidEmailException(ProjectException):
-    status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Некорректный email"
 
 # --- Ошибки, связанные с подтверждением email ---
 
