@@ -52,3 +52,4 @@ class BaseRepository(Generic[T]):
     async def delete(self, model_id: int) -> None:
         stmt = delete(self.model).where(self.model.id == model_id)
         await self.session.execute(stmt)
+        await self.session.commit()

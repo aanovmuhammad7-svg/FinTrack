@@ -36,7 +36,6 @@ class PasswordValidationErrorException(ProjectException):
     def __init__(self, validation_result: list[str]):
         super().__init__(detail=f"Пароль не соответствует требованиям:\n{validation_result}")
 
-
 class PasswordIdenticalToPreviousException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
     detail = "Пароль должен отличаться от предыдущего"
@@ -57,21 +56,17 @@ class EmailNotConfirmedException(ProjectException):
     status_code = status.HTTP_403_FORBIDDEN
     detail="Email не подтверждён"
 
-
 class RefreshTokenNotFoundException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Токен обновления не предоставлен"
-
 
 class AccessTokenNotFoundException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Токен доступа не предоставлен"
 
-
 class InvalidTokenException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
     detail = "Неверный токен"
-
 
 class ExpiredTokenException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
@@ -83,11 +78,9 @@ class InvalidOrExpiredEmailTokenException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
     detail = "Ссылка подтверждения недействительна или устарела"
 
-
 class EmailAlreadyConfirmedException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
     detail = "Почта уже подтверждена"
-
 
 class TooEarlyResendException(ProjectException):
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
@@ -100,4 +93,39 @@ class InternalServerErrorException(ProjectException):
 
     def __init__(self, reason: str = "Внутренняя ошибка сервера"):
         super().__init__(detail=reason, expose_to_client=False)
+
+# --- Ошибки связанные с Финансами ---
+
+class FinanceException(HTTPException):
+    status_code = 500
+    detail = "Внутренняя ошибка финансового сервиса"
+    expose_to_client: bool = True
+
+    def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
+        if detail:
+            self.detail = detail
+        self.expose_to_client = expose_to_client
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+
+# --- Ошибки категорий ---
+class CategoryAlreadyExists(FinanceException):
+    status_code = status.HTTP_409_CONFLICT
+
+    def __init__(self, name: str, type: str):
+        super().__init__(detail=f"Категория '{name}' типа '{type}' уже существует")
+
+
+class CategoryNotFound(FinanceException):
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, category_id: int):
+        super().__init__(detail=f"Категория с id {category_id} не найдена")
+
+
+class InvalidCategoryType(FinanceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+
+    def __init__(self, type: str):
+        super().__init__(detail=f"Недопустимый тип категории: {type}")
     

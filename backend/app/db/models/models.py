@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey
 
 from app.db.models.base import Base, IDMixin
 
@@ -30,3 +30,17 @@ class User(Base, IDMixin):
 
 
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),nullable=True)
+
+
+    categories: Mapped[list["Category"]] = relationship("Category", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+
+
+class Category(Base, IDMixin):
+    __tablename__ = "categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[str] = mapped_column(String(10), nullable=False)
+
+    user: Mapped["User"] = relationship("User", back_populates="categories", lazy="joined")
