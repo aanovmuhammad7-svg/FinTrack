@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey
+from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey, Numeric, CheckConstraint
+from decimal import Decimal
 
 from app.db.models.base import Base, IDMixin
 
@@ -33,6 +34,8 @@ class User(Base, IDMixin):
 
 
     categories: Mapped[list["Category"]] = relationship("Category", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
+    transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="user", lazy="selectin")
+
 
 
 class Category(Base, IDMixin):
@@ -44,3 +47,27 @@ class Category(Base, IDMixin):
     type: Mapped[str] = mapped_column(String(10), nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="categories", lazy="joined")
+    transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="category", lazy="selectin")
+
+
+
+class Transaction(Base, IDMixin):
+    __tablename__ = "transactions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    type: Mapped[str] = mapped_column(String(10), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False,)
+    
+    # 🔒 Бизнес-инварианты
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="check_amount_positive"),
+        CheckConstraint("type IN ('income', 'expense')", name="check_transaction_type"),
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="transactions", lazy="joined")
+    category: Mapped["Category"] = relationship("Category", back_populates="transactions", lazy="joined")

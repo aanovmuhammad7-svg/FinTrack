@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from typing import Optional
+from decimal import Decimal
 
 
 class ProjectException(HTTPException):
@@ -9,6 +10,30 @@ class ProjectException(HTTPException):
 
     def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
         if detail is not None:
+            self.detail = detail
+        self.expose_to_client = expose_to_client
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+
+class FinanceException(HTTPException):
+    status_code = 500
+    detail = "Внутренняя ошибка финансового сервиса"
+    expose_to_client: bool = True
+
+    def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
+        if detail:
+            self.detail = detail
+        self.expose_to_client = expose_to_client
+        super().__init__(status_code=self.status_code, detail=self.detail)
+
+
+class TransactionException(HTTPException):
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail = "Внутренняя ошибка сервиса транзакций"
+    expose_to_client: bool = True
+
+    def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
+        if detail:
             self.detail = detail
         self.expose_to_client = expose_to_client
         super().__init__(status_code=self.status_code, detail=self.detail)
@@ -96,19 +121,6 @@ class InternalServerErrorException(ProjectException):
 
 # --- Ошибки связанные с Финансами ---
 
-class FinanceException(HTTPException):
-    status_code = 500
-    detail = "Внутренняя ошибка финансового сервиса"
-    expose_to_client: bool = True
-
-    def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
-        if detail:
-            self.detail = detail
-        self.expose_to_client = expose_to_client
-        super().__init__(status_code=self.status_code, detail=self.detail)
-
-
-# --- Ошибки категорий ---
 class CategoryAlreadyExists(FinanceException):
     status_code = status.HTTP_409_CONFLICT
 
@@ -128,4 +140,45 @@ class InvalidCategoryType(FinanceException):
 
     def __init__(self, type: str):
         super().__init__(detail=f"Недопустимый тип категории: {type}")
-    
+
+# --- Ошибки связанные с Транзакциями ---
+
+class TransactionNotFound(TransactionException):
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, transaction_id: int):
+        super().__init__(
+            detail=f"Транзакция с id {transaction_id} не найдена"
+        )
+
+class TransactionAccessDenied(TransactionException):
+    status_code = status.HTTP_403_FORBIDDEN
+
+    def __init__(self):
+        super().__init__(
+            detail="Нет доступа к данной транзакции"
+        )
+
+class InvalidTransactionAmount(TransactionException):
+    status_code = status.HTTP_400_BAD_REQUEST
+
+    def __init__(self, amount: Decimal):
+        super().__init__(
+            detail=f"Недопустимая сумма транзакции: {amount}"
+        )
+
+class InvalidTransactionType(TransactionException):
+    status_code = status.HTTP_400_BAD_REQUEST
+
+    def __init__(self, tx_type: str):
+        super().__init__(
+            detail=f"Недопустимый тип транзакции: {tx_type}"
+        )
+
+class TransactionCategoryAccessDenied(TransactionException):
+    status_code = status.HTTP_403_FORBIDDEN
+
+    def __init__(self, category_id: int):
+        super().__init__(
+            detail=f"Категория {category_id} недоступна для данной транзакции"
+        )
