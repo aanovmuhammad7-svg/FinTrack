@@ -11,7 +11,6 @@ from app.db.models.models import Transaction
 from app.api.errors.exceptions import (
     TransactionNotFound,
     InvalidTransactionAmount,
-    InvalidTransactionType,
     TransactionCategoryAccessDenied,
 )
 
@@ -33,10 +32,6 @@ class TransactionService:
         if data.amount <= 0:
             raise InvalidTransactionAmount(data.amount)
 
-        # 2️⃣ Валидация типа
-        if data.type not in ALLOWED_TRANSACTION_TYPES:
-            raise InvalidTransactionType(data.type)
-
         # 3️⃣ Проверка доступа к категории
         category = await self.category_repo.find_one_or_none(
             id=data.category_id,
@@ -51,7 +46,6 @@ class TransactionService:
                 "user_id": user_id,
                 "category_id": data.category_id,
                 "amount": data.amount,
-                "type": data.type,
                 "description": data.description,
                 "occurred_at": data.occurred_at,
             }
@@ -87,11 +81,6 @@ class TransactionService:
             if data.amount <= 0:
                 raise InvalidTransactionAmount(data.amount)
             update_data["amount"] = data.amount
-
-        if data.type is not None:
-            if data.type not in ALLOWED_TRANSACTION_TYPES:
-                raise InvalidTransactionType(data.type)
-            update_data["type"] = data.type
 
         if data.category_id is not None:
             category = await self.category_repo.find_one_or_none(

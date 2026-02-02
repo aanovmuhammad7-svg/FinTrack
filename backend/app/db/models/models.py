@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey, Numeric, CheckConstraint
+from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey, Numeric, CheckConstraint, func
 from decimal import Decimal
 
 from app.db.models.base import Base, IDMixin
@@ -58,15 +58,13 @@ class Transaction(Base, IDMixin):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="RESTRICT"), nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    type: Mapped[str] = mapped_column(String(10), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255))
-    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False,)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
     # 🔒 Бизнес-инварианты
     __table_args__ = (
         CheckConstraint("amount > 0", name="check_amount_positive"),
-        CheckConstraint("type IN ('income', 'expense')", name="check_transaction_type"),
     )
 
     user: Mapped["User"] = relationship("User", back_populates="transactions", lazy="joined")

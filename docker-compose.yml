@@ -1,10 +1,11 @@
 version: "3.9"
+
 services:
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: FinTrack_API
+    container_name: FinTrack_api
     ports:
       - "8000:8000"
     env_file:
@@ -18,7 +19,7 @@ services:
 
   db:
     image: postgres:17
-    container_name: FinTrack_DB
+    container_name: FinTrack_db
     restart: unless-stopped
     ports:
       - "5432:5432"
@@ -51,7 +52,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: mailhog
+    container_name: FinTrack_mail_system
     ports:
       - "1025:1025"
       - "8025:8025"
