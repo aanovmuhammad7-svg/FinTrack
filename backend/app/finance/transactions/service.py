@@ -7,6 +7,7 @@ from app.finance.transactions.schemas.requests import (
     TransactionCreate,
     TransactionUpdate,
 )
+from app.finance.transactions.schemas.filters import TransactionFilter
 from app.db.models.models import Transaction
 from app.api.errors.exceptions import (
     TransactionNotFound,
@@ -110,4 +111,18 @@ class TransactionService:
         await self.transaction_repo.delete_for_user(
             transaction_id=transaction_id,
             user_id=user_id,
+        )
+
+    async def list_filtered(
+        self,
+        user_id: int,
+        filters: TransactionFilter,
+        limit: int,
+        offset: int,
+    ):
+        return await self.transaction_repo.list_by_user_filtered(
+            user_id=user_id,
+            **filters.model_dump(exclude_none=True),  # ✅ распаковка
+            limit=limit,
+            offset=offset,
         )

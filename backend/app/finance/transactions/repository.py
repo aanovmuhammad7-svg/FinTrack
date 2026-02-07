@@ -1,6 +1,7 @@
 # app/finance/transactions/repository.py
 from decimal import Decimal
 from typing import Optional, Sequence
+from datetime import datetime
 
 from sqlalchemy import select, func, delete
 
@@ -41,3 +42,39 @@ class TransactionRepository(BaseRepository[Transaction]):
     )
         await self.session.execute(stmt)
         await self.session.commit()
+
+    async def list_by_user_filtered( self, user_id: int, *,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        category_id: Optional[int] = None,
+        min_amount: Optional[Decimal] = None,
+        max_amount: Optional[Decimal] = None,
+        search: Optional[str] = None,
+        limit: int = 20,
+        offset: int = 0,
+    ):
+        stmt = select(Transaction).where(Transaction.user_id == user_id)
+
+        if date_from:
+            stmt = stmt.where(Transaction.occurred_at >= date_from)
+
+        if date_to:
+            stmt = stmt.where(Transaction.occurred_at <= date_to)
+
+        if category_id:
+            stmt = stmt.where(Transaction.category_id == category_id)
+
+        if min_amount:
+            stmt = stmt.where(Transaction.amount >= min_amount)
+
+        if max_amount:
+            stmt = stmt.where(Transaction.amount <= max_amount)
+
+        if search:
+            stmt = stmt.where(Transaction.description.ilike(f"%{search}%"))
+
+        stmt = stmt.order_by(Transaction.occurred_at.desc())
+        stmt = stmt.limit(limit).offset(offset)
+
+        result = await self.session.execute(stmt)
+        return result.scalars().all()

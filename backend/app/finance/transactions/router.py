@@ -1,5 +1,5 @@
 # app/finance/transactions/router.py
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Query
 from typing import List
 
 from app.api.dependencies.auth_dep import get_current_user
@@ -9,6 +9,7 @@ from app.finance.transactions.schemas.requests import (
     TransactionUpdate,
 )
 from app.finance.transactions.schemas.responses import TransactionResponse
+from app.finance.transactions.schemas.filters import TransactionFilter
 from app.finance.transactions.service import TransactionService
 from app.api.dependencies.transaction_dep import get_transaction_service
 
@@ -16,11 +17,7 @@ router = APIRouter(prefix="/transactions", tags=["Транзакции"])
 
 
 # --- CREATE ---
-@router.post(
-    "/",
-    response_model=TransactionResponse,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 async def create_transaction(
     data: TransactionCreate,
     current_user: User = Depends(get_current_user),
@@ -42,6 +39,22 @@ async def list_transactions(
     Получить все транзакции пользователя
     """
     return await service.list(user_id=current_user.id)
+
+
+@router.get("/filtered", response_model=List[TransactionResponse], summary="Фильтрация и пагинация транзакций")
+async def list_transactions_filtered(
+    filters: TransactionFilter = Depends(),
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
+    service: TransactionService = Depends(get_transaction_service),
+):
+    return await service.list_filtered(
+        user_id=current_user.id,
+        filters=filters,    
+        limit=limit,
+        offset=offset,
+    )
 
 
 # --- GET BY ID ---
