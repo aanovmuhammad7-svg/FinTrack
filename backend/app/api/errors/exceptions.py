@@ -1,11 +1,12 @@
-from fastapi import HTTPException, status
-from typing import Optional
 from decimal import Decimal
+from typing import Optional
+
+from fastapi import HTTPException, status
 
 
 class ProjectException(HTTPException):
-    status_code = 500
-    detail = "Внутренняя ошибка сервера"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail = "Internal server error"
     expose_to_client: bool = True
 
     def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
@@ -16,12 +17,12 @@ class ProjectException(HTTPException):
 
 
 class FinanceException(HTTPException):
-    status_code = 500
-    detail = "Внутренняя ошибка финансового сервиса"
+    status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail = "Internal finance service error"
     expose_to_client: bool = True
 
     def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
-        if detail:
+        if detail is not None:
             self.detail = detail
         self.expose_to_client = expose_to_client
         super().__init__(status_code=self.status_code, detail=self.detail)
@@ -29,156 +30,196 @@ class FinanceException(HTTPException):
 
 class TransactionException(HTTPException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-    detail = "Внутренняя ошибка сервиса транзакций"
+    detail = "Internal transaction service error"
     expose_to_client: bool = True
 
     def __init__(self, detail: Optional[str] = None, expose_to_client: bool = True):
-        if detail:
+        if detail is not None:
             self.detail = detail
         self.expose_to_client = expose_to_client
         super().__init__(status_code=self.status_code, detail=self.detail)
 
-# --- Ошибки, связанные с пользователями ---
 
 class UserAlreadyExistsException(ProjectException):
     status_code = status.HTTP_409_CONFLICT
 
     def __init__(self, user_email: str):
-        super().__init__(detail=f"Пользователь {user_email} уже зарегистрирован")
+        super().__init__(detail=f"User {user_email} already exists")
 
 
 class UserNotFoundException(ProjectException):
     status_code = status.HTTP_404_NOT_FOUND
 
     def __init__(self, user_email: str):
-        super().__init__(detail=f"Пользователь {user_email} не найден")
+        super().__init__(detail=f"User {user_email} was not found")
 
-# --- Ошибки, связанные с паролем ---
 
 class PasswordValidationErrorException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
 
     def __init__(self, validation_result: list[str]):
-        super().__init__(detail=f"Пароль не соответствует требованиям:\n{validation_result}")
+        errors = "; ".join(validation_result)
+        super().__init__(detail=f"Password does not meet the requirements: {errors}")
+
 
 class PasswordIdenticalToPreviousException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Пароль должен отличаться от предыдущего"
+    detail = "New password must differ from the previous password"
 
-# --- Ошибки, связанные с токенами сброса пароля ---
 
 class InvalidPasswordResetTokenException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Ссылка для сброса пароля недействительна"
+    detail = "Password reset link is invalid"
 
-# --- Ошибки, связанные с авторизацией и аутентификацией ---
 
 class InvalidCredentialsException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Неверные учётные данные"
+    detail = "Invalid credentials"
+
 
 class EmailNotConfirmedException(ProjectException):
     status_code = status.HTTP_403_FORBIDDEN
-    detail="Email не подтверждён"
+    detail = "Email is not confirmed"
+
 
 class RefreshTokenNotFoundException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Токен обновления не предоставлен"
+    detail = "Refresh token was not provided"
+
 
 class AccessTokenNotFoundException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Токен доступа не предоставлен"
+    detail = "Access token was not provided"
+
 
 class InvalidTokenException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Неверный токен"
+    detail = "Invalid token"
+
 
 class ExpiredTokenException(ProjectException):
     status_code = status.HTTP_401_UNAUTHORIZED
-    detail = "Токен просрочен"
+    detail = "Token has expired"
 
-# --- Ошибки, связанные с подтверждением email ---
 
 class InvalidOrExpiredEmailTokenException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Ссылка подтверждения недействительна или устарела"
+    detail = "Email confirmation link is invalid or expired"
+
 
 class EmailAlreadyConfirmedException(ProjectException):
     status_code = status.HTTP_400_BAD_REQUEST
-    detail = "Почта уже подтверждена"
+    detail = "Email is already confirmed"
+
 
 class TooEarlyResendException(ProjectException):
     status_code = status.HTTP_429_TOO_MANY_REQUESTS
-    detail = "Слишком частые попытки. Попробуйте позже"
+    detail = "Too many requests. Please try again later"
 
-# --- Общие/внутренние ошибки ---
 
 class InternalServerErrorException(ProjectException):
     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    def __init__(self, reason: str = "Внутренняя ошибка сервера"):
+    def __init__(self, reason: str = "Internal server error"):
         super().__init__(detail=reason, expose_to_client=False)
 
-# --- Ошибки связанные с Финансами ---
 
 class CategoryAlreadyExists(FinanceException):
     status_code = status.HTTP_409_CONFLICT
 
     def __init__(self, name: str, type: str):
-        super().__init__(detail=f"Категория '{name}' типа '{type}' уже существует")
+        super().__init__(detail=f"Category '{name}' with type '{type}' already exists")
 
 
 class CategoryNotFound(FinanceException):
     status_code = status.HTTP_404_NOT_FOUND
 
     def __init__(self, category_id: int):
-        super().__init__(detail=f"Категория с id {category_id} не найдена")
+        super().__init__(detail=f"Category with id {category_id} was not found")
 
 
 class InvalidCategoryType(FinanceException):
     status_code = status.HTTP_400_BAD_REQUEST
 
     def __init__(self, type: str):
-        super().__init__(detail=f"Недопустимый тип категории: {type}")
+        super().__init__(detail=f"Invalid category type: {type}")
 
-# --- Ошибки связанные с Транзакциями ---
 
 class TransactionNotFound(TransactionException):
     status_code = status.HTTP_404_NOT_FOUND
 
     def __init__(self, transaction_id: int):
-        super().__init__(
-            detail=f"Транзакция с id {transaction_id} не найдена"
-        )
+        super().__init__(detail=f"Transaction with id {transaction_id} was not found")
+
 
 class TransactionAccessDenied(TransactionException):
     status_code = status.HTTP_403_FORBIDDEN
 
     def __init__(self):
-        super().__init__(
-            detail="Нет доступа к данной транзакции"
-        )
+        super().__init__(detail="Access to this transaction is denied")
+
 
 class InvalidTransactionAmount(TransactionException):
     status_code = status.HTTP_400_BAD_REQUEST
 
     def __init__(self, amount: Decimal):
-        super().__init__(
-            detail=f"Недопустимая сумма транзакции: {amount}"
-        )
+        super().__init__(detail=f"Invalid transaction amount: {amount}")
+
 
 class InvalidTransactionType(TransactionException):
     status_code = status.HTTP_400_BAD_REQUEST
 
     def __init__(self, tx_type: str):
-        super().__init__(
-            detail=f"Недопустимый тип транзакции: {tx_type}"
-        )
+        super().__init__(detail=f"Invalid transaction type: {tx_type}")
+
 
 class TransactionCategoryAccessDenied(TransactionException):
     status_code = status.HTTP_403_FORBIDDEN
 
     def __init__(self, category_id: int):
+        super().__init__(detail=f"Category {category_id} is not available for this transaction")
+
+
+class BudgetNotFound(FinanceException):
+    status_code = status.HTTP_404_NOT_FOUND
+
+    def __init__(self, budget_id: int):
+        super().__init__(detail=f"Budget with id {budget_id} was not found")
+
+
+class InvalidBudgetPeriod(FinanceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = "Invalid budget period: period_start must be before or equal to period_end"
+
+
+class BudgetAlreadyExists(FinanceException):
+    status_code = status.HTTP_409_CONFLICT
+
+    def __init__(self, category_id: int, period_start: object, period_end: object):
         super().__init__(
-            detail=f"Категория {category_id} недоступна для данной транзакции"
+            detail=f"Budget already exists for category {category_id} in period {period_start} - {period_end}"
         )
+
+
+class BudgetCategoryTypeError(FinanceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+
+    def __init__(self, category_id: int, category_type: str):
+        super().__init__(
+            detail=f"Category {category_id} cannot be used for budget. Type={category_type}, expected=expense"
+        )
+
+
+class InvalidReportPeriod(FinanceException):
+    status_code = status.HTTP_400_BAD_REQUEST
+    detail = "Invalid report period: date_from must be before or equal to date_to"
+
+
+class UserInactiveException(ProjectException):
+    status_code = status.HTTP_403_FORBIDDEN
+    detail = "Account is inactive"
+
+
+class CSRFMissingOrInvalidException(ProjectException):
+    status_code = status.HTTP_403_FORBIDDEN
+    detail = "CSRF token is missing or invalid"

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import Depends, Request
 
 from app.db.models.models import User
@@ -10,6 +10,8 @@ from app.api.errors.exceptions import (
     RefreshTokenNotFoundException,
     InvalidTokenException,
     UserNotFoundException,
+    UserInactiveException,
+    CSRFMissingOrInvalidException,
 )
 
 
@@ -27,11 +29,22 @@ async def get_refresh_token(request: Request) -> str:
     return token
 
 
+async def verify_csrf(request: Request) -> None:
+    csrf_cookie = request.cookies.get("csrf_token")
+    csrf_header = request.headers.get("X-CSRF-Token")
+
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise CSRFMissingOrInvalidException
+
+
 async def get_current_user(
     token: str = Depends(get_access_token),
     user_repo: UserRepository = Depends(get_user_repository),
 ) -> User:
-    payload = jwt_handler.decode(token)
+    payload = jwt_handler.decode(
+        token,
+        required_claims=("sub", "user_id", "jti", "iat", "exp"),
+    )
     if not payload:
         raise InvalidTokenException
 
@@ -47,15 +60,21 @@ async def get_current_user(
     user = await user_repo.get_by_id(user_id)
     if not user:
         raise UserNotFoundException(email)
+    if not user.is_active:
+        raise UserInactiveException
 
     # защита от старых токенов после смены пароля
-    token_pwd_reset_at = payload.get("pwd_reset_at")
-    if token_pwd_reset_at:
-        token_pwd_reset_at = datetime.fromtimestamp(token_pwd_reset_at).replace(microsecond=0)
+    token_pwd_reset_at = int(payload.get("pwd_reset_at", 0))
+    token_pwd_reset_at_dt = datetime.fromtimestamp(
+        token_pwd_reset_at,
+        tz=timezone.utc,
+    ).replace(microsecond=0)
 
-        if user.last_password_reset:
-            user_pwd_reset_at = user.last_password_reset.replace(microsecond=0)
-            if token_pwd_reset_at < user_pwd_reset_at:
-                raise InvalidTokenException
+    if user.last_password_reset:
+        user_pwd_reset_at = user.last_password_reset.astimezone(
+            timezone.utc
+        ).replace(microsecond=0)
+        if token_pwd_reset_at_dt < user_pwd_reset_at:
+            raise InvalidTokenException
 
     return user

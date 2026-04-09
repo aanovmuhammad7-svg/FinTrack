@@ -1,9 +1,10 @@
+from typing import Any, Callable, Protocol, TypeVar
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from typing import Protocol, Callable, TypeVar, Any
+from slowapi.util import get_remote_address
 
 from app.core.config import settings
 
@@ -22,14 +23,14 @@ else:
         def limit(self, *args: Any, **kwargs: Any) -> Callable[[F], F]:
             def decorator(func: F) -> F:
                 return func
+
             return decorator
 
-    limiter: LimiterProtocol = DummyLimiter()
+    limiter = DummyLimiter()
 
 
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=429,
-        content={"error": "Вы отправили слишком много запросов, попробуйте позже..."}
+        content={"error": "Too many requests. Please try again later."},
     )
-

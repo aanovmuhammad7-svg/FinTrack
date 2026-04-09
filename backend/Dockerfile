@@ -6,20 +6,17 @@ RUN apt-get update && apt-get install -y \
     netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install poetry
+RUN pip install --no-cache-dir poetry
 
 COPY pyproject.toml poetry.lock ./
 
 RUN poetry config virtualenvs.create false
-RUN poetry install --no-interaction --no-root
+RUN poetry install --no-interaction --no-root --without dev
 
 COPY . .
-COPY start.sh .
-COPY run.sh .
 
-RUN chmod +x start.sh
+RUN chmod +x start.sh run.sh
 
 EXPOSE 8000
 
-RUN ["./run.sh"]
 CMD ["./start.sh"]

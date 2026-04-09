@@ -6,7 +6,7 @@ class UserBaseResponse(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
-    birthday: date
+    birthday: date | None
     email_confirmed: bool
     created_at: datetime
 

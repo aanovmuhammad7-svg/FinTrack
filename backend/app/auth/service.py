@@ -17,6 +17,7 @@ from app.api.errors.exceptions import (
     PasswordValidationErrorException,
     InvalidCredentialsException,
     EmailNotConfirmedException,
+    UserInactiveException,
     InvalidTokenException,
     UserNotFoundException,
     InvalidPasswordResetTokenException,
@@ -35,7 +36,7 @@ class RegistrationService:
     ) -> None:
         try:
             link = (
-                f"{settings.allowed_hosts}/email/confirm"
+                f"{settings.frontend_url}/email/confirm"
                 f"?email={quote(email)}&token={token}"
             )
 
@@ -118,12 +119,22 @@ class LoginService:
         if not password_handler.verify_password(password, user.hashed_password):
             raise InvalidCredentialsException()
 
+        if not user.is_active:
+            raise UserInactiveException()
+
         if settings.enable_email_confirmation and not user.email_confirmed:
             raise EmailNotConfirmedException()
+
+        pwd_reset_at = (
+            int(user.last_password_reset.timestamp())
+            if user.last_password_reset
+            else None
+        )
 
         access_token = jwt_handler.create_access_token(
             user_id=user.id,
             email=user.email,
+            pwd_reset_at=pwd_reset_at,
         )
 
         refresh_token, jti, expires_in = jwt_handler.create_refresh_token(
@@ -150,8 +161,11 @@ class RefreshService:
         self.user_repo = user_repo
         self.refresh_repo = refresh_repo
 
-    async def refresh(self, refresh_token: str) -> str:
-        payload = jwt_handler.decode(refresh_token)
+    async def refresh(self, refresh_token: str) -> tuple[str, str]:
+        payload = jwt_handler.decode(
+            refresh_token,
+            required_claims=("sub", "user_id", "jti", "iat", "exp"),
+        )
 
         user_id = payload.get("user_id")
         jti = payload.get("jti")
@@ -159,19 +173,38 @@ class RefreshService:
         if not user_id or not jti:
             raise InvalidTokenException
 
-        if not await self.refresh_repo.exists(jti):
-            raise InvalidTokenException
-
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundException(payload.get("sub"))
+        if not user.is_active:
+            raise UserInactiveException()
+
+        pwd_reset_at = (
+            int(user.last_password_reset.timestamp())
+            if user.last_password_reset
+            else None
+        )
 
         access_token = jwt_handler.create_access_token(
             user_id=user.id,
             email=user.email,
+            pwd_reset_at=pwd_reset_at,
         )
 
-        return access_token
+        new_refresh_token, new_jti, expires_in = jwt_handler.create_refresh_token(
+            user_id=user.id,
+            email=user.email,
+        )
+        rotated = await self.refresh_repo.rotate(
+            old_jti=jti,
+            new_jti=new_jti,
+            user_id=user.id,
+            expires_in=expires_in,
+        )
+        if not rotated:
+            raise InvalidTokenException
+
+        return access_token, new_refresh_token
 
 
 class LogoutService:
@@ -179,7 +212,10 @@ class LogoutService:
         self.refresh_repo = refresh_repo
 
     async def logout(self, refresh_token: str):
-        payload = jwt_handler.decode(refresh_token)
+        payload = jwt_handler.decode(
+            refresh_token,
+            required_claims=("sub", "user_id", "jti", "iat", "exp"),
+        )
         jti = payload.get("jti")
         user_id = payload.get("user_id")
 
@@ -213,7 +249,7 @@ class PasswordResetService:
         )
 
         try:
-            link = f"{settings.allowed_hosts}/reset-password?token={token}"
+            link = f"{settings.frontend_url}/reset-password?token={quote(token, safe='')}"
             html = email_handler.render_template(
                 "reset_password.html",
                 {"reset_link": link},
@@ -228,7 +264,10 @@ class PasswordResetService:
 
     
     async def reset_password(self, token: str, new_password: str) -> None:
-        payload = jwt_handler.decode(token)
+        payload = jwt_handler.decode(
+            token,
+            required_claims=("sub", "jti", "iat", "exp"),
+        )
         email = payload.get("sub")
 
         if not email:

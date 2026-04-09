@@ -1,11 +1,9 @@
-# app/finance/analytics/service.py
-from typing import List
+﻿from typing import List
+
+from loguru import logger
 
 from app.finance.analytics.repository import AnalyticsRepository
-from app.finance.analytics.schemas.responses import (
-    AnalyticsSummaryResponse,
-    AnalyticsByCategoryResponse,
-)
+from app.finance.analytics.schemas.responses import AnalyticsByCategoryResponse, AnalyticsSummaryResponse
 
 
 class AnalyticsService:
@@ -14,15 +12,19 @@ class AnalyticsService:
 
     async def summary(self, user_id: int) -> AnalyticsSummaryResponse:
         income, expense = await self.repo.summary(user_id)
+        logger.info(
+            f"Analytics summary generated user_id={user_id} income={income} expense={expense} balance={income - expense}"
+        )
 
         return AnalyticsSummaryResponse(
             income=income,
             expense=expense,
-            balance=income-expense,
+            balance=income - expense,
         )
 
     async def by_category(self, user_id: int) -> List[AnalyticsByCategoryResponse]:
         rows = await self.repo.by_category(user_id)
+        logger.info(f"Analytics by-category generated user_id={user_id} categories={len(rows)}")
 
         return [
             AnalyticsByCategoryResponse(

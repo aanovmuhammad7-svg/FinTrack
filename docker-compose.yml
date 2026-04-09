@@ -1,61 +1,90 @@
-version: "3.9"
-
 services:
-  api:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: fintrack-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "4200:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+
+  backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
-    container_name: FinTrack_api
-    ports:
-      - "8000:8000"
+    container_name: fintrack-backend
     env_file:
       - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:Alma2025_2@db:5432/fintrack
+      REDIS_URL: redis://redis:6379/0
+      SMTP_HOST: mailhog
+      COOKIE_SECURE: "false"
+      ENVIRONMENT: development
+      DEBUG: "false"
+      ALLOWED_HOSTS: http://127.0.0.1:4200,http://localhost:4200,http://127.0.0.1:8000,http://localhost:8000
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    restart: on-failure
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
 
   db:
-    image: postgres:17
-    container_name: FinTrack_db
-    restart: unless-stopped
+    image: postgres:16-alpine
+    container_name: fintrack-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Alma2025_2
+      POSTGRES_DB: fintrack
     ports:
       - "5432:5432"
-    env_file:
-      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 30s
-      timeout: 30s
-      retries: 5
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fintrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: FinTrack_Redis
-    restart: unless-stopped
+    container_name: fintrack-redis
     ports:
       - "6379:6379"
-    env_file:
-      - .env
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+    restart: unless-stopped
 
   mailhog:
-    image: mailhog/mailhog:latest
-    container_name: FinTrack_mail_system
+    image: mailhog/mailhog:v1.0.1
+    container_name: fintrack-mailhog
     ports:
       - "1025:1025"
       - "8025:8025"
+    restart: unless-stopped
 
 volumes:
   postgres_data:

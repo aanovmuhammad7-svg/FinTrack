@@ -1,25 +1,42 @@
-from fastapi import APIRouter, BackgroundTasks, status, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from redis.asyncio import Redis
 from loguru import logger
+from redis.asyncio import Redis
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_async_session
-from app.api.dependencies.redis_dep import get_redis
-from app.auth.utils.cookie_handler import cookie_handler
-from app.auth.schemas.requests import UserCreateRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest
-from app.auth.schemas.responses import MessageResponse, TokenResponse
-from app.auth.repository import UserRepository, RefreshTokenRepository
+from app.api.dependencies.auth_dep import verify_csrf
 from app.api.dependencies.limiter import limiter
-from app.auth.service import RegistrationService, LoginService, RefreshService, LogoutService, PasswordResetService
-from app.api.errors.exceptions import UserAlreadyExistsException, PasswordValidationErrorException, RefreshTokenNotFoundException
+from app.api.dependencies.redis_dep import get_redis
+from app.api.errors.exceptions import InvalidTokenException, RefreshTokenNotFoundException
+from app.auth.repository import RefreshTokenRepository, UserRepository
+from app.auth.schemas.requests import (
+    ForgotPasswordRequest,
+    LoginRequest,
+    ResetPasswordRequest,
+    UserCreateRequest,
+)
+from app.auth.schemas.responses import MessageResponse, TokenResponse
+from app.auth.service import (
+    LoginService,
+    LogoutService,
+    PasswordResetService,
+    RefreshService,
+    RegistrationService,
+)
+from app.auth.utils.cookie_handler import cookie_handler
+from app.db.database import get_async_session
 
 
-router = APIRouter(prefix="/auth", tags=["Авторизация пользователей"])
+router = APIRouter(prefix="/auth", tags=["Authorization"])
 
 
-@router.post("/register", response_model=MessageResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("2/minute")
+@router.post(
+    "/register",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register user",
+)
+@limiter.limit("10/hour")
 async def register_user(
     request: Request,
     data: UserCreateRequest,
@@ -29,31 +46,20 @@ async def register_user(
     user_repo = UserRepository(session=session)
     auth_service = RegistrationService(user_repo=user_repo)
 
-    try:
-        user = await auth_service.register_user(data, background_tasks)
-    except UserAlreadyExistsException as e:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": str(e)}
-        )
-    except PasswordValidationErrorException as e:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": str(e)}
-        )
+    user = await auth_service.register_user(data, background_tasks)
 
-    message = f"Пользователь {user.email} успешно создан"
-    logger.info(f"Пользователь {user.email} успешно создан")
+    message = f"User {user.email} was created successfully"
+    logger.info(f"User {user.email} was created successfully")
 
     if user.email_confirmed is False:
-        message += "На вашу почту отправлено письмо для подтверждения регистрации."
-        logger.info("На почту пользователя отправлено письмо для подтверждения регистрации")
+        message += " Confirmation email was sent."
+        logger.info("Confirmation email was queued for delivery")
 
     return MessageResponse(message=message)
 
 
-@router.post("/login", response_model=TokenResponse)
-@limiter.limit("5/minute")
+@router.post("/login", response_model=TokenResponse, summary="Login")
+@limiter.limit("10/minute")
 async def login(
     request: Request,
     data: LoginRequest,
@@ -84,10 +90,12 @@ async def login(
 
     return response
 
-@router.post("/refresh")
-@limiter.limit("10/minute")
+
+@router.post("/refresh", summary="Refresh tokens")
+@limiter.limit("30/minute")
 async def refresh(
     request: Request,
+    _: None = Depends(verify_csrf),
     session: AsyncSession = Depends(get_async_session),
     redis: Redis = Depends(get_redis),
 ):
@@ -99,7 +107,7 @@ async def refresh(
     refresh_repo = RefreshTokenRepository(redis=redis)
     refresh_service = RefreshService(user_repo, refresh_repo)
 
-    access_token = await refresh_service.refresh(refresh_token)
+    access_token, new_refresh_token = await refresh_service.refresh(refresh_token)
 
     response = JSONResponse(
         content={
@@ -108,35 +116,41 @@ async def refresh(
         }
     )
 
+    csrf_token = request.cookies.get("csrf_token")
     cookie_handler.set_auth_tokens(
         response=response,
         access_token=access_token,
-        refresh_token=refresh_token,
+        refresh_token=new_refresh_token,
+        csrf_token=csrf_token,
     )
 
     return response
 
-@router.post("/logout")
+
+@router.post("/logout", summary="Logout")
+@limiter.limit("30/minute")
 async def logout(
     request: Request,
+    _: None = Depends(verify_csrf),
     redis: Redis = Depends(get_redis),
 ):
     refresh_token = request.cookies.get("refresh_token")
-    if not refresh_token:
-        return JSONResponse({"message": "Нет refresh токена"}, status_code=400)
+    if refresh_token:
+        refresh_repo = RefreshTokenRepository(redis=redis)
+        logout_service = LogoutService(refresh_repo=refresh_repo)
+        try:
+            await logout_service.logout(refresh_token)
+        except InvalidTokenException:
+            logger.warning("Logout requested with invalid refresh token")
 
-    refresh_repo = RefreshTokenRepository(redis=redis)
-    logout_service = LogoutService(refresh_repo=refresh_repo)
-
-    await logout_service.logout(refresh_token)
-
-    response = JSONResponse({"message": "Вы вышли из системы"})
+    response = JSONResponse({"message": "You have been logged out"})
     cookie_handler.clear_auth_tokens(response)
 
     return response
 
-@router.post("/forgot-password", response_model=MessageResponse)
-@limiter.limit("2/minute")
+
+@router.post("/forgot-password", response_model=MessageResponse, summary="Request password reset")
+@limiter.limit("3/15minute")
 async def forgot_password(
     request: Request,
     data: ForgotPasswordRequest,
@@ -151,12 +165,12 @@ async def forgot_password(
     await service.forgot_password(data.email)
 
     return MessageResponse(
-        message="Если аккаунт существует, письмо отправлено"
+        message="If the account exists, the reset email was sent"
     )
 
 
-@router.post("/reset-password", response_model=MessageResponse)
-@limiter.limit("5/minute")
+@router.post("/reset-password", response_model=MessageResponse, summary="Reset password")
+@limiter.limit("5/15minute")
 async def reset_password(
     request: Request,
     data: ResetPasswordRequest,
@@ -173,4 +187,4 @@ async def reset_password(
         new_password=data.new_password,
     )
 
-    return MessageResponse(message="Пароль успешно изменён")
+    return MessageResponse(message="Password was changed successfully")

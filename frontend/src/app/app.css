@@ -1,0 +1,156 @@
+:host {
+  display: block;
+}
+
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+  padding-top: 92px;
+  background:
+    radial-gradient(circle at top left, rgba(209, 140, 55, 0.18), transparent 28rem),
+    radial-gradient(circle at bottom right, rgba(58, 183, 134, 0.16), transparent 24rem),
+    linear-gradient(180deg, rgba(251, 243, 230, 0.72) 0%, rgba(245, 234, 214, 0.5) 100%);
+}
+
+.app-shell.no-topbar {
+  padding-top: 0;
+}
+
+.topbar {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  width: min(1240px, calc(100% - 32px));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(104, 72, 52, 0.12);
+  background: rgba(255, 250, 244, 0.74);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 40px rgba(40, 29, 21, 0.1);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+
+.topbar-hidden {
+  transform: translate(-50%, -140%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #30231b;
+}
+
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c96d37, #8f4527);
+  color: #fff8f1;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.brand-copy {
+  display: grid;
+  line-height: 1;
+}
+
+.brand-copy strong {
+  font-size: 1rem;
+}
+
+.brand-copy small {
+  color: #78675b;
+  text-transform: lowercase;
+}
+
+.nav-panel {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nav-panel a,
+.nav-button {
+  border: 0;
+  background: transparent;
+  color: #5f4f44;
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.nav-panel a:hover,
+.nav-button:hover,
+.nav-panel .active {
+  color: #2c211b;
+  background: rgba(255, 255, 255, 0.68);
+  transform: translateY(-1px);
+}
+
+.glow {
+  position: fixed;
+  width: 20rem;
+  height: 20rem;
+  border-radius: 999px;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.75;
+  animation: drift 16s ease-in-out infinite alternate;
+}
+
+.glow-a {
+  top: -6rem;
+  right: -4rem;
+  background: rgba(218, 138, 63, 0.22);
+}
+
+.glow-b {
+  bottom: -7rem;
+  left: -5rem;
+  background: rgba(46, 126, 94, 0.18);
+  animation-duration: 20s;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(1.5rem, -1rem, 0) scale(1.08);
+  }
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    width: min(100% - 20px, 100%);
+    border-radius: 28px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-shell {
+    padding-top: 132px;
+  }
+
+  .app-shell.no-topbar {
+    padding-top: 0;
+  }
+}

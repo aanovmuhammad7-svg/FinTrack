@@ -1,0 +1,22 @@
+<div class="app-shell" [class.no-topbar]="!showTopbar()">
+  <header class="topbar" *ngIf="showTopbar()" [class.topbar-hidden]="hideTopbarOnLandingScroll()">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark">FT</span>
+      <span class="brand-copy">
+        <strong>FinTrack</strong>
+        <small>finance workspace</small>
+      </span>
+    </a>
+
+    <nav class="nav-panel">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Главная</a>
+      <a *ngIf="!authService.isAuthenticated()" routerLink="/login" routerLinkActive="active">Вход</a>
+      <a *ngIf="!authService.isAuthenticated()" routerLink="/register" routerLinkActive="active">Регистрация</a>
+      <button *ngIf="authService.isAuthenticated()" type="button" class="nav-button" (click)="logout()">Выйти</button>
+    </nav>
+  </header>
+
+  <div class="glow glow-a"></div>
+  <div class="glow glow-b"></div>
+  <router-outlet />
+</div>

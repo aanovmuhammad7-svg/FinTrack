@@ -1,13 +1,14 @@
 import socket
-from typing import Any, Dict
-from functools import lru_cache
 from email.mime.text import MIMEText
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from functools import lru_cache
+from typing import Any, Dict
+
 from aiosmtplib import SMTP, SMTPAuthenticationError, SMTPConnectError, SMTPException
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+from loguru import logger
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
-from loguru import logger
 
 
 class EmailHandler:
@@ -27,14 +28,16 @@ class EmailHandler:
         self.email_from = email_from
         self.env = Environment(
             loader=FileSystemLoader(template_path),
-            autoescape=select_autoescape(["html", "xml"])
+            autoescape=select_autoescape(["html", "xml"]),
         )
 
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((SMTPException, socket.gaierror, TimeoutError, ConnectionRefusedError)),
-        reraise=True
+        retry=retry_if_exception_type(
+            (SMTPException, socket.gaierror, TimeoutError, ConnectionRefusedError)
+        ),
+        reraise=True,
     )
     async def send_email(self, to: str, subject: str, html_content: str) -> None:
         msg = MIMEText(html_content, "html", "utf-8")
@@ -57,20 +60,20 @@ class EmailHandler:
             finally:
                 if smtp.is_connected:
                     await smtp.quit()
-        except SMTPAuthenticationError as e:
-            logger.error(f"[SMTP] Ошибка авторизации при отправке на {to}: {type(e).__name__}: {e}")
+        except SMTPAuthenticationError as exc:
+            logger.error(f"[SMTP] Authentication failed while sending to {to}: {type(exc).__name__}: {exc}")
             raise
-        except SMTPConnectError as e:
-            logger.error(f"[SMTP] Не удалось подключиться к серверу при отправке на {to}: {type(e).__name__}: {e}")
+        except SMTPConnectError as exc:
+            logger.error(f"[SMTP] Could not connect while sending to {to}: {type(exc).__name__}: {exc}")
             raise
-        except SMTPException as e:
-            logger.error(f"[SMTP] Общая SMTP ошибка при отправке на {to}: {type(e).__name__}: {e}")
+        except SMTPException as exc:
+            logger.error(f"[SMTP] SMTP error while sending to {to}: {type(exc).__name__}: {exc}")
             raise
-        except (socket.gaierror, ConnectionRefusedError, TimeoutError) as e:
-            logger.error(f"[SMTP] Сетевая ошибка при отправке на {to}: {type(e).__name__}: {e}")
+        except (socket.gaierror, ConnectionRefusedError, TimeoutError) as exc:
+            logger.error(f"[SMTP] Network error while sending to {to}: {type(exc).__name__}: {exc}")
             raise
-        except Exception as e:
-            logger.exception(f"[SMTP] Неизвестная ошибка при отправке на {to}: {type(e).__name__}: {e}")
+        except Exception as exc:
+            logger.exception(f"[SMTP] Unexpected error while sending to {to}: {type(exc).__name__}: {exc}")
             raise
 
     def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
@@ -81,5 +84,6 @@ class EmailHandler:
 @lru_cache
 def get_email_handler() -> EmailHandler:
     return EmailHandler()
+
 
 email_handler = get_email_handler()

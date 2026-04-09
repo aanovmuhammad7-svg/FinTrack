@@ -1,4 +1,4 @@
-from typing import TypedDict, NotRequired, cast, Dict, Any
+from typing import TypedDict, NotRequired, cast, Dict, Any, Sequence
 from pathlib import Path
 import jwt
 from uuid import uuid4
@@ -14,7 +14,7 @@ class JWTPayload(TypedDict):
     exp: int
     jti: str
     user_id: int
-    pwd_reset_at: NotRequired[int]
+    pwd_reset_at: int
 
 
 class JWTHandler:
@@ -31,12 +31,14 @@ class JWTHandler:
         *,
         user_id: int,
         email: str,
+        pwd_reset_at: int | None = None,
     ) -> str:
         payload = self._base_payload(
             email=email,
             expires_delta=timedelta(minutes=self.access_exp_minutes),
             user_id=user_id,
         )
+        payload["pwd_reset_at"] = pwd_reset_at or 0
 
         return jwt.encode(
             cast(dict[str, object], payload),
@@ -88,12 +90,17 @@ class JWTHandler:
     )
 
 
-    def decode(self, token: str) -> JWTPayload:
+    def decode(self, token: str, required_claims: Sequence[str] | None = None) -> JWTPayload:
         try:
+            options: Dict[str, Any] = {}
+            if required_claims:
+                options["require"] = list(required_claims)
+
             payload = jwt.decode(
                 token,
                 self.public_key,
                 algorithms=[self.algorithm],
+                options=options,
             )
             return cast(JWTPayload, payload)
         except jwt.ExpiredSignatureError:

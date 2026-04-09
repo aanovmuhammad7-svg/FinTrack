@@ -7,9 +7,8 @@ from app.core.config import settings
 
 
 class PasswordValidator:
-    """
-    Класс для валидации паролей на основе заданного уровня строгости.
-    """
+    """Validate passwords according to the configured strictness level."""
+
     VALID_LEVELS = {"none", "light", "medium", "strong"}
 
     def __init__(
@@ -19,7 +18,7 @@ class PasswordValidator:
     ):
         self.level = level.lower()
         if self.level not in self.VALID_LEVELS:
-            raise ValueError(f"Недопустимый уровень проверки пароля: {self.level}")
+            raise ValueError(f"Invalid password validation level: {self.level}")
 
         self._common_passwords: set[str] = set()
 
@@ -27,26 +26,23 @@ class PasswordValidator:
             path = Path(common_passwords_path)
             if path.exists():
                 try:
-                    with path.open(encoding="utf-8") as f:
+                    with path.open(encoding="utf-8") as file:
                         self._common_passwords = {
                             line.strip().lower()
-                            for line in f
+                            for line in file
                             if line.strip()
                         }
                 except Exception:
-                    # сознательно без print / raise
                     self._common_passwords = set()
 
     def validate(self, password: str, email: Optional[str] = None) -> list[str]:
-        """
-        Возвращает список ошибок.
-        Пустой список означает, что пароль валиден.
-        """
+        """Return a list of validation errors. Empty list means the password is valid."""
+
         errors: list[str] = []
 
         if self.level == "none":
             if not password:
-                errors.append("Пароль не может быть пустым")
+                errors.append("Password must not be empty")
             return errors
 
         errors += self._check_length(password)
@@ -62,26 +58,26 @@ class PasswordValidator:
     def _check_length(self, password: str) -> list[str]:
         min_len = 8 if self.level == "light" else 10
         if len(password) < min_len:
-            return [f"Пароль должен содержать минимум {min_len} символов"]
+            return [f"Password must contain at least {min_len} characters"]
         return []
 
     def _check_characters(self, password: str) -> list[str]:
         errors: list[str] = []
 
         if not re.search(r"[A-Za-z]", password):
-            errors.append("Пароль должен содержать хотя бы одну букву")
+            errors.append("Password must contain at least one letter")
         if not re.search(r"\d", password):
-            errors.append("Пароль должен содержать хотя бы одну цифру")
+            errors.append("Password must contain at least one digit")
 
         if self.level in ("medium", "strong"):
             if not re.search(r"[!@#$%^&*()_+\-=\[\]{};:\\|,.<>/?~]", password):
-                errors.append("Пароль должен содержать хотя бы один спецсимвол")
+                errors.append("Password must contain at least one special character")
 
         if self.level == "strong":
             if not re.search(r"[a-z]", password):
-                errors.append("Пароль должен содержать хотя бы одну строчную букву")
+                errors.append("Password must contain at least one lowercase letter")
             if not re.search(r"[A-Z]", password):
-                errors.append("Пароль должен содержать хотя бы одну заглавную букву")
+                errors.append("Password must contain at least one uppercase letter")
 
         return errors
 
@@ -91,17 +87,17 @@ class PasswordValidator:
         email_part = email.split("@")[0].lower()
 
         if password == email_part:
-            errors.append("Пароль не должен совпадать с email")
+            errors.append("Password must not match the email")
         elif email_part in password:
-            errors.append("Пароль не должен содержать email")
+            errors.append("Password must not contain the email")
         elif SequenceMatcher(None, email_part, password).ratio() > 0.7:
-            errors.append("Пароль слишком похож на email")
+            errors.append("Password is too similar to the email")
 
         return errors
 
     def _check_common_password(self, password: str) -> list[str]:
         if password.lower() in self._common_passwords:
-            return ["Пароль слишком распространён"]
+            return ["Password is too common"]
         return []
 
 

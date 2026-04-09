@@ -1,16 +1,18 @@
-from uuid import uuid4
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
+from uuid import uuid4
+
 from loguru import logger
 
-from app.db.models.models import User
-from app.core.config import settings
-from app.auth.repository import UserRepository
-from app.email.utils.email_handler import email_handler
 from app.api.errors.exceptions import (
-    TooEarlyResendException,
     EmailAlreadyConfirmedException,
     InvalidOrExpiredEmailTokenException,
+    TooEarlyResendException,
 )
+from app.auth.repository import UserRepository
+from app.core.config import settings
+from app.db.models.models import User
+from app.email.utils.email_handler import email_handler
 
 
 class ConfirmyEmailService:
@@ -28,7 +30,7 @@ class ConfirmyEmailService:
 
         created_at = user.confirmation_token_created_at
         if not created_at or datetime.now(timezone.utc) - created_at > timedelta(
-            hours=settings.email_confirm_token_expire
+            minutes=settings.email_confirm_token_expire
         ):
             raise InvalidOrExpiredEmailTokenException
 
@@ -43,12 +45,11 @@ class ConfirmyEmailService:
         )
 
         if not updated_user:
-            logger.error(
-                f"Ошибка при подтверждении email: не удалось обновить пользователя с email {email}"
-            )
+            logger.error(f"Failed to confirm email for {email}: user update returned no result")
             raise InvalidOrExpiredEmailTokenException()
 
-        logger.info(f"Email пользователя {email} успешно подтверждён", extra={"log_info": True})
+        logger.info(f"Email for user {email} was confirmed successfully")
+
 
 class ResendConfirmationService:
     def __init__(self, user_repo: UserRepository):
@@ -60,7 +61,7 @@ class ResendConfirmationService:
 
         created_at = user.confirmation_token_created_at
         if created_at and datetime.now(timezone.utc) - created_at < timedelta(
-            hours=settings.email_confirm_token_expire
+            minutes=settings.email_confirm_token_expire
         ):
             raise TooEarlyResendException
 
@@ -75,17 +76,20 @@ class ResendConfirmationService:
         )
 
         try:
-            link = f"{settings.allowed_hosts}/email/confirm?email={user.email}&token={new_token}"
+            link = (
+                f"{settings.frontend_url}/email/confirm"
+                f"?email={quote(user.email)}&token={new_token}"
+            )
             html_content = email_handler.render_template(
                 "confirm_email.html",
-                {"confirmation_link": link}
+                {"confirmation_link": link},
             )
             await email_handler.send_email(
                 to=user.email,
-                subject="Подтверждение регистрации",
+                subject="Confirm your registration",
                 html_content=html_content,
             )
-        except Exception as e:
+        except Exception as exc:
             logger.error(
-                f"Ошибка отправки email для подтверждения ({user.email}): {type(e).__name__}: {e}"
+                f"Failed to send confirmation email to {user.email}: {type(exc).__name__}: {exc}"
             )

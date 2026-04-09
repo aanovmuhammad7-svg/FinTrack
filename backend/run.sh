@@ -9,6 +9,4 @@ done
 
 echo "DB is up"
 
-alembic revision --autogenerate -m "add migrations"
-
 alembic upgrade head

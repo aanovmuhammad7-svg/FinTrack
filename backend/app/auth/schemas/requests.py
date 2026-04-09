@@ -11,7 +11,7 @@ class UserCreateRequest(UserBaseRequest):
     password: str
     first_name: str
     last_name: str
-    birthday: date
+    birthday: date | None = None
 
 
 class LoginRequest(UserBaseRequest):

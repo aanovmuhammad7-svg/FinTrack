@@ -1,21 +1,24 @@
 import logging
 import sys
-from typing import Any, Dict, Tuple, Literal
+from typing import Any, Dict, Literal, Tuple
+
 from loguru import logger
-from pydantic import PostgresDsn, RedisDsn
+from pydantic import PostgresDsn, RedisDsn, field_validator
 
 from app.core.logging import InterceptHandler
 from app.core.settings.base import BaseAppSettings
 
+
 class AppSettings(BaseAppSettings):
+    environment: Literal["development", "staging", "production", "test"] = "development"
 
-    # --- Пароли ---
-    password_validation_level: Literal["none", "light", "medium", "strong"]  # Уровень строгости валидации паролей
-    passwords_common_list_path: str  # Путь к файлу со списком часто используемых паролей
-    password_bcrypt_salt_rounds: int # Количество раундов при генерации соли для шифрования пароля
+    # Password validation
+    password_validation_level: Literal["none", "light", "medium", "strong"]
+    passwords_common_list_path: str
+    password_bcrypt_salt_rounds: int
 
-    # --- Аргументы FastAPI ---
-    debug: bool
+    # FastAPI settings
+    debug: bool = False
     docs_url: str = "/docs"
     openapi_prefix: str = ""
     openapi_url: str = "/openapi.json"
@@ -23,48 +26,47 @@ class AppSettings(BaseAppSettings):
     title: str = "FinTrack API"
     version: str = "0.1.0"
 
-    # --- Postgersql ---
+    # PostgreSQL
     database_url: PostgresDsn
     connection_count: int
     additional_connections: int
 
-    # --- Redis ---
+    # Redis
     redis_url: RedisDsn
     redis_max_connections: int
 
-    # --- Логгер ---
+    # Logging
     logging_level: int = logging.INFO
     loggers: Tuple[str, str] = ("uvicorn.asgi", "uvicorn.access")
 
-    # --- Frontend ---
-    allowed_hosts: str = "http://localhost:3000"
+    # Frontend
+    allowed_hosts: list[str] | str = ["http://localhost:3000"]
 
-    # --- JWT ---
-    jwt_algorithm: str  # Алгоритм подписи JWT-токенов
-    jwt_access_token_expire: int  # Время жизни access-токена (в минутах)
-    jwt_refresh_token_expire: int  # Время жизни refresh-токена (в минутах)
-    jwt_reset_token_expire: int  # Время жизни токена для сброса пароля (в минутах)
-    jwt_private_key_path: str  # Путь к файлу с приватным ключом для JWT
-    jwt_public_key_path: str  # Путь к файлу с публичным ключом для JWT
+    # JWT
+    jwt_algorithm: str
+    jwt_access_token_expire: int
+    jwt_refresh_token_expire: int
+    jwt_reset_token_expire: int
+    jwt_private_key_path: str
+    jwt_public_key_path: str
     cookie_secure: bool
 
-    # --- Email ---
-    email_templates_path: str  # Путь к шаблонам email-сообщений
-    enable_email_confirmation: bool  # Включение подтверждения по email
-    email_confirm_token_expire: int  # Время жизни токена подтверждения email (в минутах)
+    # Email
+    email_templates_path: str
+    enable_email_confirmation: bool
+    email_confirm_token_expire: int
 
-    # --- Email_Confirm_sistem ---
-    email_from: str  # Адрес отправителя email
-    smtp_username: str  # Имя пользователя для SMTP-сервера
-    smtp_password: str  # Пароль для SMTP-сервера
-    smtp_host: str  # Хост SMTP-сервера
-    smtp_port: int  # Порт SMTP-сервера
+    # SMTP
+    email_from: str
+    smtp_username: str
+    smtp_password: str
+    smtp_host: str
+    smtp_port: int
 
-    # --- Ограничения ---
-    enable_rate_limiter: bool  # Включение ограничителя частоты запросов
+    # Rate limiting
+    enable_rate_limiter: bool
 
     @property
-    # --- Аргументы FastAPI ---
     def fastapi_kwargs(self) -> Dict[str, Any]:
         return {
             "debug": self.debug,
@@ -76,11 +78,70 @@ class AppSettings(BaseAppSettings):
             "version": self.version,
         }
 
-    # --- Конфигурации логгера ---
+    @field_validator("allowed_hosts", mode="before")
+    @classmethod
+    def parse_allowed_hosts(cls, value: object) -> list[str]:
+        if value is None:
+            return ["http://localhost:3000"]
+
+        if isinstance(value, str):
+            hosts = [item.strip() for item in value.split(",") if item.strip()]
+            return hosts or ["http://localhost:3000"]
+
+        if isinstance(value, (list, tuple)):
+            hosts = [str(item).strip() for item in value if str(item).strip()]
+            return hosts or ["http://localhost:3000"]
+
+        raise ValueError("allowed_hosts must be a string or list of strings")
+
+    @field_validator("environment", mode="before")
+    @classmethod
+    def parse_environment(cls, value: object) -> str:
+        if value is None:
+            return "development"
+
+        normalized = str(value).strip().lower()
+        aliases = {
+            "dev": "development",
+            "development": "development",
+            "local": "development",
+            "stage": "staging",
+            "staging": "staging",
+            "prod": "production",
+            "production": "production",
+            "release": "production",
+            "test": "test",
+            "testing": "test",
+        }
+        if normalized not in aliases:
+            raise ValueError("environment must be one of development, staging, production, test")
+        return aliases[normalized]
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+
+        normalized = str(value).strip().lower()
+        truthy = {"1", "true", "yes", "on", "debug"}
+        falsy = {"0", "false", "no", "off", "release", "prod", "production"}
+
+        if normalized in truthy:
+            return True
+        if normalized in falsy:
+            return False
+
+        raise ValueError("debug must be a boolean-like value")
+
+    @property
+    def frontend_url(self) -> str:
+        return self.allowed_hosts[0]
+
     def configure_logging(self) -> None:
-
         logging.getLogger().handlers = [InterceptHandler()]
-
 
         for logger_name in ("uvicorn", "uvicorn.error", "uvicorn.access", "fastapi"):
             uvicorn_logger = logging.getLogger(logger_name)
@@ -88,7 +149,6 @@ class AppSettings(BaseAppSettings):
             uvicorn_logger.propagate = False
 
         logger.remove()
-
         logger.add(
             sys.stdout,
             colorize=True,

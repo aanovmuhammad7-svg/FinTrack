@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey, Numeric, CheckConstraint, func
+from sqlalchemy import Integer, Boolean, Date, DateTime, String, Text, ForeignKey, Numeric, CheckConstraint, UniqueConstraint, func
 from decimal import Decimal
 
 from app.db.models.base import Base, IDMixin
@@ -35,6 +35,7 @@ class User(Base, IDMixin):
 
     categories: Mapped[list["Category"]] = relationship("Category", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
     transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="user", lazy="selectin")
+    budgets: Mapped[list["Budget"]] = relationship("Budget", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
 
 
 
@@ -48,6 +49,29 @@ class Category(Base, IDMixin):
 
     user: Mapped["User"] = relationship("User", back_populates="categories", lazy="joined")
     transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="category", lazy="selectin")
+    budgets: Mapped[list["Budget"]] = relationship("Budget", back_populates="category", lazy="selectin")
+
+
+class Budget(Base, IDMixin):
+    __tablename__ = "budgets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id", ondelete="CASCADE"), nullable=False, index=True)
+    limit_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    period_start: Mapped[date] = mapped_column(Date, nullable=False)
+    period_end: Mapped[date] = mapped_column(Date, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("limit_amount > 0", name="check_budget_limit_positive"),
+        CheckConstraint("period_start <= period_end", name="check_budget_period_valid"),
+        UniqueConstraint("user_id", "category_id", "period_start", "period_end", name="uq_budget_user_category_period"),
+    )
+
+    user: Mapped["User"] = relationship("User", back_populates="budgets", lazy="joined")
+    category: Mapped["Category"] = relationship("Category", back_populates="budgets", lazy="joined")
 
 
 

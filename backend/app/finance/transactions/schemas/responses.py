@@ -10,8 +10,7 @@ class TransactionResponse(BaseModel):
     category_id: int
     amount: Decimal
     description: str | None
-    occurred_at: datetime
+    occurred_at: datetime | None
     created_at: datetime
 
-    class Config:
-        model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)

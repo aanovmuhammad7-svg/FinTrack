@@ -39,6 +39,9 @@ class BaseRepository(Generic[T]):
         return instance
 
     async def update(self, model_id: int, data: dict[str, Any]) -> Optional[T]:
+        if not data:
+            return await self.get_by_id(model_id)
+
         stmt = (
             update(self.model)
             .where(self.model.id == model_id)

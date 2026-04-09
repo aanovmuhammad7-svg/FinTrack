@@ -7,8 +7,7 @@ class CategoryResponse(BaseModel):
     name: str
     type: Literal["income", "expense"]
 
-    class Config:
-        model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CategoriesListResponse(BaseModel):

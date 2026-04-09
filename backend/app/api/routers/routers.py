@@ -6,6 +6,9 @@ from app.users.router import router as user_router
 from app.finance.categories.router import router as categories_router
 from app.finance.transactions.router import router as transactions
 from app.finance.analytics.router import router as analytics_router
+from app.finance.budgets.router import router as budgets_router
+from app.finance.reports.router import router as reports_router
+from app.system.router import router as system_router
 
 api_router = APIRouter()
 
@@ -15,3 +18,6 @@ api_router.include_router(user_router)
 api_router.include_router(categories_router)
 api_router.include_router(transactions)
 api_router.include_router(analytics_router)
+api_router.include_router(budgets_router)
+api_router.include_router(reports_router)
+api_router.include_router(system_router)

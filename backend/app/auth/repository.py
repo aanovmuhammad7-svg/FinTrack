@@ -125,6 +125,50 @@ class RefreshTokenRepository:
         pipe.srem(self._user_key(user_id), jti)
         await pipe.execute()
 
+    async def rotate(
+        self,
+        *,
+        old_jti: str,
+        new_jti: str,
+        user_id: int,
+        expires_in: int,
+    ) -> bool:
+        script = """
+local old_refresh_key = KEYS[1]
+local old_user_key = KEYS[2]
+local new_refresh_key = KEYS[3]
+local new_user_key = KEYS[4]
+local user_id = ARGV[1]
+local old_jti = ARGV[2]
+local new_jti = ARGV[3]
+local expires_in = tonumber(ARGV[4])
+
+if redis.call('EXISTS', old_refresh_key) == 0 then
+    return 0
+end
+
+redis.call('DEL', old_refresh_key)
+redis.call('SREM', old_user_key, old_jti)
+redis.call('SET', new_refresh_key, user_id, 'EX', expires_in)
+redis.call('SADD', new_user_key, new_jti)
+redis.call('EXPIRE', new_user_key, expires_in)
+
+return 1
+"""
+        result = await self.redis.eval(
+            script,
+            4,
+            self._refresh_key(old_jti),
+            self._user_key(user_id),
+            self._refresh_key(new_jti),
+            self._user_key(user_id),
+            str(user_id),
+            old_jti,
+            new_jti,
+            str(expires_in),
+        )
+        return bool(result == 1)
+
     async def delete_all_for_user(self, user_id: int) -> None:
         key = self._user_key(user_id)
         jtis = cast(set[str], await self.redis.smembers(key)) # type: ignore

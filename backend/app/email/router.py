@@ -1,23 +1,24 @@
-from fastapi import APIRouter, Depends, status, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models.models import User
-from app.db.database import get_async_session
 from app.api.dependencies.limiter import limiter
 from app.auth.repository import UserRepository
-from app.api.dependencies.auth_dep import get_current_user
-from app.api.dependencies.repo_dep import get_user_repository
+from app.db.database import get_async_session
+from app.email.schemas.requests import EmailConfirmationRequest, EmailResendRequest
 from app.email.schemas.responses import MessageResponse
-from app.email.schemas.requests import EmailConfirmationRequest
 from app.email.service import ConfirmyEmailService, ResendConfirmationService
-from app.api.errors.exceptions import UserNotFoundException
 
 
-router = APIRouter(prefix="/email", tags=["Модуль работы с email"])
+router = APIRouter(prefix="/email", tags=["Email"])
 
 
-@router.post("/confirm", response_model=MessageResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("5/minute")
+@router.post(
+    "/confirm",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Confirm email",
+)
+@limiter.limit("10/minute")
 async def confirm_email(
     request: Request,
     data: EmailConfirmationRequest,
@@ -27,22 +28,26 @@ async def confirm_email(
     service = ConfirmyEmailService(user_repo)
 
     await service.confirm_email(email=data.email, token=str(data.confirmation_token))
-    return MessageResponse(message="Email успешно подтверждён")
+    return MessageResponse(message="Email was confirmed successfully")
 
 
-
-@router.post("/resend", response_model=MessageResponse, status_code=status.HTTP_200_OK)
-@limiter.limit("2/minute")
+@router.post(
+    "/resend",
+    response_model=MessageResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Resend confirmation email",
+)
+@limiter.limit("3/15minute")
 async def resend_confirmation(
     request: Request,
-    current_user: User = Depends(get_current_user),
-    user_repo: UserRepository = Depends(get_user_repository),
+    data: EmailResendRequest,
+    session: AsyncSession = Depends(get_async_session),
 ):
+    user_repo = UserRepository(session)
     service = ResendConfirmationService(user_repo)
-    user = await user_repo.get_by_email(current_user.email)
+    user = await user_repo.get_by_email(data.email)
 
-    if not user:
-        raise UserNotFoundException(current_user.email)
+    if user and not user.email_confirmed:
+        await service.resend_confirmation(user)
 
-    await service.resend_confirmation(user)
-    return MessageResponse(message="Если аккаунт существует, письмо отправлено повторно")
+    return MessageResponse(message="If the account exists, the confirmation email was sent again")

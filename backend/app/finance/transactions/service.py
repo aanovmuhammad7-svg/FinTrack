@@ -1,5 +1,6 @@
 # app/finance/transactions/service.py
 from typing import Sequence, Dict, Any, cast
+from loguru import logger
 
 from app.finance.transactions.repository import TransactionRepository
 from app.finance.categories.repository import CategoryRepository
@@ -15,8 +16,6 @@ from app.api.errors.exceptions import (
     TransactionCategoryAccessDenied,
 )
 
-ALLOWED_TRANSACTION_TYPES = {"income", "expense"}
-
 
 class TransactionService:
     def __init__(
@@ -29,20 +28,21 @@ class TransactionService:
 
     # --- CREATE ---
     async def create(self, user_id: int, data: TransactionCreate) -> Transaction:
-        # 1️⃣ Валидация суммы
         if data.amount <= 0:
+            logger.warning(f"Transaction create rejected: invalid amount user_id={user_id} amount={data.amount}")
             raise InvalidTransactionAmount(data.amount)
 
-        # 3️⃣ Проверка доступа к категории
         category = await self.category_repo.find_one_or_none(
             id=data.category_id,
             user_id=user_id,
         )
         if not category:
+            logger.warning(
+                f"Transaction create rejected: category access denied user_id={user_id} category_id={data.category_id}"
+            )
             raise TransactionCategoryAccessDenied(data.category_id)
 
-        # 4️⃣ Создание транзакции
-        return await self.transaction_repo.add(
+        transaction = await self.transaction_repo.add(
             {
                 "user_id": user_id,
                 "category_id": data.category_id,
@@ -51,10 +51,16 @@ class TransactionService:
                 "occurred_at": data.occurred_at,
             }
         )
+        logger.info(
+            f"Transaction created user_id={user_id} transaction_id={transaction.id} category_id={transaction.category_id} amount={transaction.amount}"
+        )
+        return transaction
 
     # --- LIST ---
     async def list(self, user_id: int) -> Sequence[Transaction]:
-        return await self.transaction_repo.list_by_user(user_id=user_id)
+        transactions = await self.transaction_repo.list_by_user(user_id=user_id)
+        logger.info(f"Transaction list fetched user_id={user_id} count={len(transactions)}")
+        return transactions
 
     # --- GET BY ID ---
     async def get_by_id(self, user_id: int, transaction_id: int) -> Transaction:
@@ -63,6 +69,9 @@ class TransactionService:
             user_id=user_id,
         )
         if not transaction:
+            logger.warning(
+                f"Transaction get rejected: not found user_id={user_id} transaction_id={transaction_id}"
+            )
             raise TransactionNotFound(transaction_id)
 
         return transaction
@@ -80,6 +89,9 @@ class TransactionService:
 
         if data.amount is not None:
             if data.amount <= 0:
+                logger.warning(
+                    f"Transaction update rejected: invalid amount user_id={user_id} transaction_id={transaction_id} amount={data.amount}"
+                )
                 raise InvalidTransactionAmount(data.amount)
             update_data["amount"] = data.amount
 
@@ -89,6 +101,9 @@ class TransactionService:
                 user_id=user_id,
             )
             if not category:
+                logger.warning(
+                    f"Transaction update rejected: category access denied user_id={user_id} transaction_id={transaction_id} category_id={data.category_id}"
+                )
                 raise TransactionCategoryAccessDenied(data.category_id)
             update_data["category_id"] = data.category_id
 
@@ -102,6 +117,7 @@ class TransactionService:
             model_id=transaction.id,
             data=update_data,
         )
+        logger.info(f"Transaction updated user_id={user_id} transaction_id={transaction_id} fields={list(update_data.keys())}")
 
         return cast(Transaction, updated)
 
@@ -112,6 +128,7 @@ class TransactionService:
             transaction_id=transaction_id,
             user_id=user_id,
         )
+        logger.info(f"Transaction deleted user_id={user_id} transaction_id={transaction_id}")
 
     async def list_filtered(
         self,
@@ -120,9 +137,13 @@ class TransactionService:
         limit: int,
         offset: int,
     ):
-        return await self.transaction_repo.list_by_user_filtered(
+        transactions = await self.transaction_repo.list_by_user_filtered(
             user_id=user_id,
-            **filters.model_dump(exclude_none=True),  # ✅ распаковка
+            **filters.model_dump(exclude_none=True),
             limit=limit,
             offset=offset,
         )
+        logger.info(
+            f"Transaction filtered list fetched user_id={user_id} count={len(transactions)} limit={limit} offset={offset}"
+        )
+        return transactions

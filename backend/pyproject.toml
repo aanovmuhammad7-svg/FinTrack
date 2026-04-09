@@ -24,6 +24,18 @@ dependencies = [
     "cryptography (>=46.0.3,<47.0.0)"
 ]
 
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "integration: tests that require a running backend stack",
+]
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

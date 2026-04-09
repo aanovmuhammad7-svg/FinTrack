@@ -1,8 +1,14 @@
-from pydantic_settings import BaseSettings
+from pathlib import Path
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BACKEND_ROOT = Path(__file__).resolve().parents[3]
 
 
 class BaseAppSettings(BaseSettings):
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=BACKEND_ROOT / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
