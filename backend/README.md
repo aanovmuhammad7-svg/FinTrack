@@ -3,7 +3,8 @@
 ## Local development
 
 1. Create `backend/.env` from `backend/.env.example`.
-2. Start infrastructure and API:
+2. Create local JWT keys at `backend/private.pem` and `backend/public.pem`.
+3. Start infrastructure and API:
 
 ```bash
 docker compose up --build
@@ -42,3 +43,4 @@ $env:FINTRACK_MAILHOG_API_URL="http://127.0.0.1:8025/api/v2/messages"
 
 - Container startup runs `alembic upgrade head` before launching the API.
 - New migrations must be created manually. The container no longer auto-generates migrations on startup.
+- JWT key files and local `.env` files are intentionally kept out of git. Keep them only on your machine or in your deployment secrets store.

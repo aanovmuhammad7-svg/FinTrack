@@ -19,7 +19,7 @@ export class App {
 
   readonly showTopbar = computed(() => {
     const url = this.currentUrl();
-    return url !== '/login' && url !== '/register';
+    return url !== '/login' && url !== '/register' && url !== '/email/confirm';
   });
 
   readonly hideTopbarOnLandingScroll = computed(

@@ -4,12 +4,14 @@ import { authGuard } from './core/guards/auth.guard';
 import { LandingPageComponent } from './features/landing/landing-page.component';
 import { LoginPageComponent } from './features/auth/login-page.component';
 import { RegisterPageComponent } from './features/auth/register-page.component';
+import { EmailConfirmPageComponent } from './features/email/email-confirm-page.component';
 import { DashboardPageComponent } from './features/dashboard/dashboard-page.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', component: LandingPageComponent },
   { path: 'login', component: LoginPageComponent },
   { path: 'register', component: RegisterPageComponent },
+  { path: 'email/confirm', component: EmailConfirmPageComponent },
   { path: 'dashboard', component: DashboardPageComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: '' },
 ];
